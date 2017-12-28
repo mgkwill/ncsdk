@@ -22,6 +22,8 @@ fi
 
 # download the file
 cp ncsdk.conf /tmp
+cp ports/fedora/install-ncsdk.sh /tmp
+cp ports/fedora/requirements_dnf.txt /tmp
 
 rm -f /tmp/ncsdk_redirector.txt
 
@@ -72,6 +74,9 @@ sudo rm -rf NCSDK
 sudo mv $ncsdk_pkg* NCSDK
 cd /opt/movidius/NCSDK
 cp /tmp/ncsdk.conf .
+cp /tmp/install-ncsdk.sh .
+cp /tmp/requirements_dnf.txt .
+
 ./install-ncsdk.sh
 
 # leave the uninstall script on the target
