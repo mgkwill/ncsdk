@@ -241,7 +241,7 @@ function install_fedora_dependencies
 	exit_on_error "$SUDO_PREFIX dnf update -y"
 	exit_on_error "$SUDO_PREFIX dnf install -qy unzip coreutils curl git python3 python3-pip"
 	exit_on_error "$SUDO_PREFIX dnf install -qy $(cat "$DIR/requirements_dnf.txt")"
-	exit_on_error "$SUDO_PREFIX dnf install -qy boost-devel"
+	exit_on_error "$SUDO_PREFIX dnf install -qy boost-python3-devel"
 }
 
 # Ubuntu dependencies handler
@@ -375,6 +375,14 @@ function configure_caffe_options
 	# Use/don't use CUDA
 	if [ $CAFFE_USE_CUDA == "no" ]; then
 		sed -i 's/CPU_ONLY  "Build Caffe without CUDA support" OFF/CPU_ONLY  "Build Caffe without CUDA support" ON/' CMakeLists.txt
+	fi
+
+	# Configure Boost-Python3 for Fedora 27
+	if [ "${OS_DISTRO,,}" == "fedora" ]; then
+		sed -i 's#Boost_PYTHON_LIBRARY_DEBUG:FILEPATH=/usr/lib64/libboost_python.so#Boost_PYTHON_LIBRARY_DEBUG:FILEPATH=/usr/lib64/libboost_python3.so#' build/CMakeCache.txt
+		sed -i 's#Boost_PYTHON_LIBRARY_RELEASE:FILEPATH=/usr/lib64/libboost_python.so#Boost_PYTHON_LIBRARY_RELEASE:FILEPATH=/usr/lib64/libboost_python3.so#' build/CMakeCache.txt
+		sed -i 's#;/usr/lib64/libboost_python.so;#;/usr/lib64/libboost_python3.so;#' build/CMakeCache.txt
+		sed -i 's#_Boost_COMPONENTS_SEARCHED:INTERNAL=atomic;chrono;date_time;filesystem;python;#_Boost_COMPONENTS_SEARCHED:INTERNAL=atomic;chrono;date_time;filesystem;python;python3;#' build/CMakeCache.txt
 	fi
 }
 
@@ -627,6 +635,12 @@ $SUDO_PREFIX rm -f $INSTDIR/lib/libmvnc.so.0
 
 $SUDO_PREFIX ln -s $INSTDIR/lib/mvnc/libmvnc.so.0 $INSTDIR/lib/libmvnc.so.0
 $SUDO_PREFIX ln -s $INSTDIR/lib/mvnc/libmvnc.so.0 $INSTDIR/lib/libmvnc.so
+
+if [ "${OS_DISTRO,,}" == "fedora" ]; then
+	# Setup Fedora Sym Links
+	$SUDO_PREFIX ln -s $INSTDIR/lib/mvnc/ /lib/mvnc
+	$SUDO_PREFIX ln -s $INSTDIR/lib/mvnc/libmvnc.so.0 /usr/local/bin/libmvnc.so
+fi
 
 $SUDO_PREFIX ldconfig
 
