@@ -50,8 +50,8 @@ elif [ "${OS_DISTRO,,}" == "raspbian" ] && [ $OS_VERSION -ge 80 ] && [ $OS_VERSI
 		)
 	printf "$ERR_MSG"
 	exit 1
-elif [ "${OS_DISTRO,,}" == "fedora" ] && [ $OS_VERSION -ge 27 ]; then
-	echo "Installing on Fedora 27"
+elif [ "${OS_DISTRO,,}" == "fedora" ] || [ "${OS_DISTRO,,}" == "centos" ]; then
+	echo "Installing on Fedora/CentOs [Experimental Tested on Fedora 26/27 CentOS 7]"
 else
 	echo "Your current combination of linux distribution and distribution version is not officially supported!"
 	exit 1
@@ -239,9 +239,9 @@ function install_fedora_dependencies
 {
 	# Install dnf dependencies
 	exit_on_error "$SUDO_PREFIX dnf update -y"
-	exit_on_error "$SUDO_PREFIX dnf install -qy unzip coreutils curl git python3 python3-pip"
-	exit_on_error "$SUDO_PREFIX dnf install -qy $(cat "$DIR/requirements_dnf.txt")"
-	exit_on_error "$SUDO_PREFIX dnf install -qy boost-python3-devel"
+	exit_on_error "$SUDO_PREFIX dnf install -y unzip coreutils curl git python3 python3-pip"
+	exit_on_error "$SUDO_PREFIX dnf install -y $(cat "$DIR/requirements_dnf.txt")"
+	exit_on_error "$SUDO_PREFIX dnf install -y boost-python3-devel"
 }
 
 # Ubuntu dependencies handler
@@ -291,7 +291,7 @@ function find_tensorflow ()
 	fi
 }
 
-function install_ubuntu_python_dependencies
+function install_python_dependencies
 {
         echo "Installing python dependencies..."
 
@@ -376,14 +376,6 @@ function configure_caffe_options
 	if [ $CAFFE_USE_CUDA == "no" ]; then
 		sed -i 's/CPU_ONLY  "Build Caffe without CUDA support" OFF/CPU_ONLY  "Build Caffe without CUDA support" ON/' CMakeLists.txt
 	fi
-
-	# Configure Boost-Python3 for Fedora 27
-	if [ "${OS_DISTRO,,}" == "fedora" ]; then
-		sed -i 's#Boost_PYTHON_LIBRARY_DEBUG:FILEPATH=/usr/lib64/libboost_python.so#Boost_PYTHON_LIBRARY_DEBUG:FILEPATH=/usr/lib64/libboost_python3.so#' build/CMakeCache.txt
-		sed -i 's#Boost_PYTHON_LIBRARY_RELEASE:FILEPATH=/usr/lib64/libboost_python.so#Boost_PYTHON_LIBRARY_RELEASE:FILEPATH=/usr/lib64/libboost_python3.so#' build/CMakeCache.txt
-		sed -i 's#;/usr/lib64/libboost_python.so;#;/usr/lib64/libboost_python3.so;#' build/CMakeCache.txt
-		sed -i 's#_Boost_COMPONENTS_SEARCHED:INTERNAL=atomic;chrono;date_time;filesystem;python;#_Boost_COMPONENTS_SEARCHED:INTERNAL=atomic;chrono;date_time;filesystem;python;python3;#' build/CMakeCache.txt
-	fi
 }
 
 function find_and_try_adjusting_symlinks()
@@ -418,7 +410,7 @@ function check_and_install_caffe()
 		CAFFE_SRC="https://github.com/intel/caffe.git"
 		CAFFE_VER="1.0.3"
 		CAFFE_DIR=intel-caffe
-	elif [ $CAFFE_FLAVOR == "intel" ] && [ "${OS_DISTRO,,}" == "fedora" ]; then
+	elif [ $CAFFE_FLAVOR == "intel" ] && ([ "${OS_DISTRO,,}" == "fedora" ]  || [ "${OS_DISTRO,,}" == "centos" ]); then
                 CAFFE_SRC="https://github.com/intel/caffe.git"
                 CAFFE_VER="1.0.3"
                 CAFFE_DIR=intel-caffe
@@ -447,7 +439,7 @@ function check_and_install_caffe()
 					return 0
 				fi
 			fi
-		elif [ $CAFFE_FLAVOR == "intel" ] && [ "${OS_DISTRO,,}" == "fedora" ]; then
+		elif [ $CAFFE_FLAVOR == "intel" ] && ([ "${OS_DISTRO,,}" == "fedora" ]  || [ "${OS_DISTRO,,}" == "centos" ]); then
                         find_and_try_adjusting_symlinks
 
                         # Look for intel caffe specific operation to determine the version of caffe currently running
@@ -529,6 +521,13 @@ function check_and_install_caffe()
 	mkdir -p build
 	cd build
 	eval cmake .. $STDOUT_QUIET
+	# Configure Boost-Python3 for Fedora/CentOS
+	if [ "${OS_DISTRO,,}" == "fedora" ]  || [ "${OS_DISTRO,,}" == "centos" ]; then
+		sed -i 's#Boost_PYTHON_LIBRARY_DEBUG:FILEPATH=/usr/lib64/libboost_python.so#Boost_PYTHON_LIBRARY_DEBUG:FILEPATH=/usr/lib64/libboost_python3.so#' $SETUPDIR/caffe/build/CMakeCache.txt
+		sed -i 's#Boost_PYTHON_LIBRARY_RELEASE:FILEPATH=/usr/lib64/libboost_python.so#Boost_PYTHON_LIBRARY_RELEASE:FILEPATH=/usr/lib64/libboost_python3.so#' $SETUPDIR/caffe/build/CMakeCache.txt
+		sed -i 's#;/usr/lib64/libboost_python.so;#;/usr/lib64/libboost_python3.so;#' $SETUPDIR/caffe/build/CMakeCache.txt
+		sed -i 's#_Boost_COMPONENTS_SEARCHED:INTERNAL=atomic;chrono;date_time;filesystem;python;#_Boost_COMPONENTS_SEARCHED:INTERNAL=atomic;chrono;date_time;filesystem;python;python3;#' $SETUPDIR/caffe/build/CMakeCache.txt
+	fi
 	eval make -j $MAKE_PROCS all $STDOUT_QUIET
 
 	echo "Installing caffe..."
@@ -557,7 +556,7 @@ if [ $INSTALL_TOOLKIT == 'yes' ]; then
 	############################## Install dependencies #######################################
 	if [ "${OS_DISTRO,,}" == "ubuntu" ] || [ $OS_VERSION == 1604 ]; then
 		install_ubuntu_dependencies
-		install_ubuntu_python_dependencies
+		install_python_dependencies
 	elif [ "${OS_DISTRO,,}" == "raspbian" ] && [ $INSTALL_TENSORFLOW == "yes" ]; then
 		ERR_MSG=$(cat <<- END
 			${YELLOW}NOTE: Tensorflow is not officially supported on
@@ -567,9 +566,9 @@ if [ $INSTALL_TOOLKIT == 'yes' ]; then
 		printf "$ERR_MSG"
 		install_raspbian_dependencies
 		install_raspbian_python_dependencies
-	elif [ "${OS_DISTRO,,}" == "fedora" ] && [ $OS_VERSION == "27" ]; then
+	elif [ "${OS_DISTRO,,}" == "fedora" ]  || [ "${OS_DISTRO,,}" == "centos" ]; then
 		install_fedora_dependencies
-		install_ubuntu_python_dependencies
+		install_python_dependencies
 	fi
 
 	check_and_install_caffe
@@ -618,10 +617,12 @@ function remove_ncapi_deb
 	fi
 }
 
-# IMPORTANT: Do not change the order
-remove_ncapi_deb python3-mvnc
-remove_ncapi_deb mvnc-dev
-remove_ncapi_deb mvnc
+if [ "${OS_DISTRO,,}" != "fedora" ] && [ "${OS_DISTRO,,}" != "centos" ]; then
+	# IMPORTANT: Do not change the order
+	remove_ncapi_deb python3-mvnc
+	remove_ncapi_deb mvnc-dev
+	remove_ncapi_deb mvnc
+fi
 
 # Set the trap handler again
 set_trap
@@ -636,10 +637,9 @@ $SUDO_PREFIX rm -f $INSTDIR/lib/libmvnc.so.0
 $SUDO_PREFIX ln -s $INSTDIR/lib/mvnc/libmvnc.so.0 $INSTDIR/lib/libmvnc.so.0
 $SUDO_PREFIX ln -s $INSTDIR/lib/mvnc/libmvnc.so.0 $INSTDIR/lib/libmvnc.so
 
-if [ "${OS_DISTRO,,}" == "fedora" ]; then
-	# Setup Fedora Sym Links
-	$SUDO_PREFIX ln -s $INSTDIR/lib/mvnc/ /lib/mvnc
-	$SUDO_PREFIX ln -s $INSTDIR/lib/mvnc/libmvnc.so.0 /usr/local/bin/libmvnc.so
+if [ "${OS_DISTRO,,}" == "fedora" ] || [ "${OS_DISTRO,,}" == "centos" ]; then
+	# Setup Fedora ld.so shared libraries
+	echo -e "${INSTDIR}/lib/\n${INSTDIR}/lib/mvnc/" | $SUDO_PREFIX tee /etc/ld.so.conf.d/mvnc.conf
 fi
 
 $SUDO_PREFIX ldconfig
